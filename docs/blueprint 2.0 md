@@ -1,0 +1,1622 @@
+Blueprint_SynapsePlus_Modulos_v1.0.md
+
+Produto: Synapse+ (white-label) • Stack: Laravel 11 + Filament + Livewire 3 + TailwindCSS + MySQL 8 • Arquitetura: Monólito modular, offline-ready, sem APIs externas
+Autor: João Victor Gonzalez Pawlowicz • Data: Nov/2025
+
+EN short note: This is the full functional + technical blueprint for Synapse+. Laravel + Filament + Livewire monolith, no external APIs. Each module below includes objectives, UX, flows, permissions, data model and component map so Cursor can generate code directly.
+
+⸻
+
+0) Visão Geral (Overview)
+	•	Papéis (roles): Admin Global, Coordenador, Profissional, Secretária.
+	•	Escopo por unidade: ScopeUnit middleware filtra tudo por unit_id (Admin ignora).
+	•	Marca branca (white-label): Nome, logo, cores, rodapé e mensagens editáveis via Filament.
+	•	Landing + Login: Landing institucional (status do sistema) → Login → App.
+	•	Sidebar: Relógio em tempo real + seletor de unidade (dropdown), visível para usuários com >1 unidade.
+	•	Agenda inteligente: Visual unificada (admin/coordenador), cores por profissional (configurável), clique em célula cria agendamento com data=hoje e duração padrão=1h (editável).
+	•	Evolução automática: Ao marcar atendimento como Concluído, cria Evolução pendente para o profissional.
+	•	Avaliação independente: Criada manualmente (profissional/coordenador/admin), baseada em templates (somente admin cria no Filament).
+	•	Chat interno: Chatify sem Pusher (polling Livewire), Admin vê todas mensagens.
+	•	Sem APIs externas: exports locais (PDF/CSV), gráficos locais (Chart.js).
+	•	Backups & Auditoria: Cron diário, logs de ações, exportações CSV.
+
+⸻
+
+1) Dashboard
+
+1.1 Objetivo
+
+Visão de trabalho e saúde operacional. Cards e gráficos variam por role.
+
+EN: Role-aware overview with cards, KPIs and quick links.
+
+1.2 UX/Comportamento
+	•	Cards (exemplos):
+	•	Agendamentos do dia (por unidade / profissional).
+	•	Evoluções pendentes (do usuário e da unidade).
+	•	Avaliações em andamento.
+	•	Faltas do dia (no-show).
+	•	Gráficos: produtividade por profissional (semana/mês), frequência por paciente.
+	•	Acesso rápido: botões para “Novo Agendamento”, “Novo Paciente”, “Minhas Pendências”.
+	•	Responsivo: grid 1–4 colunas; skeletons em loading.
+
+1.3 Permissões
+	•	Admin: todos os dados (todas as unidades).
+	•	Coordenador: dados da unidade atual.
+	•	Profissional: próprios dados (e pendências).
+	•	Secretária: agenda e cadastros básicos.
+
+1.4 Modelo de Dados (leitura)
+
+Consultas-read agregadas (services) sobre appointments, evolutions, assessments.
+
+1.5 Componentes
+	•	Livewire: Dashboard/DashboardOverview (cards, gráficos, atalhos).
+	•	Blade: x-card, x-kpi, x-chart.
+
+⸻
+
+2) Agenda Inteligente
+
+2.1 Objetivo
+
+Planejamento e operação diária. Leitura “de relance”, criação ágil, personalização por profissional.
+
+EN: Unified calendar with color-coded professionals, quick create on click, day/week/month/list views.
+
+2.2 UX/Comportamento
+	•	Visual unificada (Admin/Coordenador): múltiplos profissionais com cores próprias.
+	•	Cores por profissional: configuráveis em “Configurações → Aparência → Cor do Profissional”; aplicadas no card (borda/fundo translúcido).
+	•	Legibilidade do evento:
+	•	Linha 1: Horário (negrito)
+	•	Linha 2: Paciente (tooltip com idade/alertas)
+	•	Linha 3: Profissional (nome colorido) + especialidade (opcional)
+	•	Status com ícone/cor (⚪ pendente, 🟡 confirmado, 🟢 check-in, 🔵 concluído, 🔴 cancelado).
+	•	Clique em célula vazia: abre modal “Novo agendamento” com data=hoje, hora inicial=clicada, hora final=+1h (editável).
+	•	Arrastar (“drag”) entre slots: altera horário mantendo duração (opcional).
+	•	Modos de visualização: mês / semana / dia / lista; preferências persistidas (localStorage).
+	•	Filtros: unidade, profissional, paciente, sala, status; persistidos em sessão.
+	•	Mini timeline lateral: próximos horários livres.
+	•	Atalhos: ← → navega dias; N = novo agendamento; F = foco dia atual.
+
+2.3 Regras e Lógica
+	•	Duração padrão: 60 min (config geral; pode ser 30/45/50/60).
+	•	Ajuste automático do final: ao mudar início, recalcula fim = início + duração padrão (editável).
+	•	Validações:
+	•	end_time > start_time
+	•	evitar sobreposição do mesmo profissional (warning com sugestão de horários alternativos)
+	•	bloqueios por indisponibilidade/feriados
+	•	agendar no passado: bloqueado (Admin pode forçar)
+	•	Status de fluxo: Agendado → Confirmado → Check-in → Em andamento → Concluído → (dispara Evolução).
+
+2.4 Permissões
+	•	Admin/Coordenador: ver todos (unidade/all), criar/editar/cancelar.
+	•	Profissional: ver próprios; criar/editar seus.
+	•	Secretária: ver unidade; criar/editar/cancelar.
+
+2.5 Dados (tabelas principais)
+	•	appointments: id, unit_id, room_id, professional_id, patient_id, start_at, end_at, status, category_id, notes.
+	•	rooms, appointment_categories (por unidade).
+	•	Preferências: user_preferences (default_view, default_duration, default_unit_id, etc).
+
+2.6 Componentes
+	•	Livewire:
+	•	Agenda/Calendar (grid + navegação),
+	•	Agenda/AppointmentModal (criar/editar; auto-preenchimento contextual),
+	•	Agenda/FilterSidebar (filtros),
+	•	Agenda/EventCard (render do slot).
+	•	Blade: x-agenda.legend (cores → profissionais).
+
+⸻
+
+3) Pacientes
+
+3.1 Objetivo
+
+Cadastro mínimo + prontuário unificado com documentos e timeline.
+
+EN: Minimal create, full unified record with timeline and clinical alerts.
+
+3.2 UX/Comportamento
+	•	Cadastro mínimo: nome obrigatório (restante opcional).
+	•	Campos clínicos: diagnóstico(s), alergias, medicações, plano de crise, restrições sensoriais, contatos responsáveis.
+	•	Tags clínicas: TEA, TDAH, etc.
+	•	Uploads: PDF/JPG/PNG por categorias (laudos, exames, relatórios); drag & drop multi-upload.
+	•	Timeline do paciente: Evoluções, Avaliações, Documentos com datas e autores.
+	•	Alertas visuais: alergias, risco, protocolos especiais.
+
+3.3 Permissões
+	•	Admin/Coordenador: ver/editar pacientes da unidade.
+	•	Profissional: ver/editar pacientes próprios (e da unidade, conforme policy).
+	•	Secretária: criar/editar dados básicos; sem acesso a conteúdo clínico sensível (policy).
+
+3.4 Dados
+	•	patients: id, unit_id, name, birthdate, diagnosis_tags(json), allergies, medications, crisis_plan, notes, ...
+	•	patient_documents: patient_id, category, path, uploaded_by
+	•	patient_timeline_events: patient_id, type(evolution/assessment/document), ref_id, created_by
+
+3.5 Componentes
+	•	Livewire: Patients/PatientList, Patients/PatientProfile, Patients/PatientDocuments.
+	•	Blade: x-patient.card, x-timeline.
+
+⸻
+
+4) Evoluções
+
+4.1 Objetivo
+
+Registro clínico por sessão concluída, com fluxo de pendências, rascunho e finalização.
+
+EN: Auto-created on completed appointment; drafts; simple signature; reviewable by coordinator.
+
+4.2 Fluxo
+	1.	Agendamento → Concluído ⇒ cria Evolução (pendente): patient_id, appointment_id, professional_id, unit_id.
+	2.	Profissional abre, preenche (autosave rascunho), e finaliza (assinatura confirmatória simples).
+	3.	Coordenador/Admin podem revisar e marcar “Revisada”.
+	4.	Evolução entra na Timeline do paciente.
+
+4.3 Estados
+	•	pendente → rascunho → finalizada → revisada → arquivada (admin).
+
+4.4 Campos
+	•	Relato clínico, conduta, objetivos, observações internas (visível coord/admin), finalized_at, reviewed_at, signature_meta.
+
+4.5 Permissões
+	•	Profissional: CRUD da sua evolução (até finalizar); adendos após finalizada.
+	•	Coordenador: visualizar unidade, revisar.
+	•	Admin: total.
+
+4.6 Dados
+	•	evolutions: id, unit_id, appointment_id, patient_id, professional_id, status, content(json/rich), signature_meta(json), reviewed_by, ...
+	•	evolution_addendums: addenda vinculados.
+
+4.7 Componentes
+	•	Livewire: Evolutions/EvolutionEditor, Evolutions/PendingEvolutions.
+	•	Exports: PDF (dompdf).
+
+⸻
+
+5) Avaliações
+
+5.1 Objetivo
+
+Formulários estruturados (anamnese, periódicas, protocolos), a partir de templates.
+
+EN: Internal form builder; admin-managed templates; professional fills, coordinator reviews.
+
+5.2 Fluxo
+	•	Admin (Filament) cria/edita Templates com campos (JSON).
+	•	Profissional/Coordenador/Admin iniciam avaliação para um paciente (independente da agenda).
+	•	Autosave durante preenchimento.
+	•	Finalizar & assinar (bloqueia edição; coord/admin podem revisar).
+	•	Entra na Timeline.
+
+5.3 Templates (via Filament)
+	•	Campos: tipo (texto, número, data, select, checkbox, upload), obrigatoriedade, visibilidade, categoria (anamnese/periódica/etc.), versão (version).
+	•	Apenas Admin cria/edita templates.
+
+5.4 Estados
+
+em_preenchimento → finalizada → revisada.
+
+5.5 Permissões
+	•	Profissional: criar/preencher próprias; ver suas finalizadas; sem editar após finalizar.
+	•	Coordenador: ver todas da unidade; revisar.
+	•	Admin: total; gerencia templates.
+
+5.6 Dados
+	•	assessment_templates: id, unit_id|null, name, version, fields(json), category
+	•	assessments: id, unit_id, patient_id, professional_id, template_id, responses(json), status, signature_meta, ...
+
+5.7 Componentes
+	•	Livewire: Assessments/AssessmentFormBuilder (admin), Assessments/PatientAssessments (preenchimento).
+	•	Preview: x-template.preview.
+	•	Exports: PDF.
+
+⸻
+
+6) Relatórios
+
+6.1 Objetivo
+
+Visões clínicas e operacionais filtráveis e exportáveis.
+
+EN: Local charts & exports; saved filters; role-aware scope.
+
+6.2 Tipos
+	•	Clínico: evoluções, avaliações por período/unidade/profissional.
+	•	Atendimentos: volume, status, taxa de no-show.
+	•	Produtividade por profissional: atendimentos/h, finalizações de evolução.
+	•	Frequência por paciente: presenças vs faltas.
+	•	Unidade: visão consolidada.
+
+6.3 UX
+	•	Filtros persistentes; botões “Salvar filtro” e “Exportar (PDF/CSV)”.
+	•	Gráficos (Chart.js) + tabelas.
+	•	Modo “Leitura” para impressão.
+
+6.4 Permissões
+	•	Admin: global.
+	•	Coordenador: unidade.
+	•	Profissional: visão própria (produtividade pessoal).
+	•	Secretária: relatórios operacionais básicos (agenda/frequência).
+
+6.5 Componentes
+	•	Livewire: Reports/ReportGenerator (multitab: Clínico, Atendimentos, Produtividade, Frequência, Unidade).
+	•	Exports: dompdf/CSV.
+
+⸻
+
+7) Configurações
+
+7.1 Objetivo
+
+Personalizar sistema, aparência, usuários/unidades e regras operacionais.
+
+EN: Branding, appearance, users & units, schedules, system status, backups.
+
+7.2 Seções (Livewire + Filament onde indicado)
+	•	Perfil & Preferências (usuário): tema claro/escuro (auto), unidade padrão, cor do profissional.
+	•	Unidades & Salas (Admin/Coord): CRUD; capacidade, feriados, bloqueios.
+	•	Usuários & Permissões (Admin): CRUD, roles (Spatie), vinculação de unidade(s), impersonate.
+	•	Aparência (Admin): cores, tipografia, densidade de layout, ícones.
+	•	Branding (Admin): system_name, logo, favicon, tagline, rodapé.
+	•	Status do sistema (Admin via Filament): online/manutenção/offline + mensagem; versão atual.
+	•	Regras de agenda (Admin/Coord): duração padrão (30/45/50/60), horários úteis por dia, bloqueios.
+	•	Backups & Logs (Admin): visualizar lista de backups, gerar/baixar/restaurar.
+
+7.3 Dados
+	•	system_settings: nome, logo, cores, status, mensagens, versão.
+	•	professional_schedules: disponibilidade e bloqueios por usuário.
+	•	user_preferences: tema, view agenda, unidade padrão, cor.
+
+⸻
+
+8) Chat Interno (Chatify + Livewire Polling)
+
+8.1 Objetivo
+
+Comunicação interna simples e auditável, sem serviços externos.
+
+EN: Chatify UI, replace Pusher with Livewire polling, admin can audit all messages.
+
+8.2 Comportamento
+	•	Canais: 1:1 (privado) e unidade (grupo da unidade).
+	•	Polling: wire:poll.3s (busca mensagens novas).
+	•	Admin: visualiza todas as conversas (auditoria).
+	•	Uploads: imagens (sem áudio).
+	•	Notificações visuais: badge na aba chat.
+
+8.3 Dados
+	•	messages: id, unit_id|null, thread_id|null, sender_id, receiver_id|null, content, attachments(json), created_at.
+	•	Opcional: threads para conversas persistentes.
+
+8.4 Componentes
+	•	Livewire: Chat/ChatRoom (lista + histórico), Chat/MessageInput.
+	•	Blade: x-chat.sidebar (acesso flutuante).
+
+⸻
+
+9) Logs & Auditoria + Backups
+
+9.1 Objetivo
+
+Rastreabilidade, segurança e recuperação.
+
+EN: Action logs, login logs, daily DB+storage backups with restore UI.
+
+9.2 Auditoria
+	•	Logs de login: IP, user agent, horário.
+	•	Logs de ações: create/update/delete, entidade, payload (JSON redigido).
+	•	Exibição: linha do tempo por usuário e por entidade; filtros e export CSV.
+
+9.3 Backups
+	•	Cron diário: dump do MySQL + compactação do storage.
+	•	UI (Admin): listar backups, baixar/restaurar; alerta de último backup.
+	•	Integridade: checagem simples (tabelas essenciais existem? tamanhos plausíveis?).
+
+9.4 Dados
+	•	audit_logs: id, user_id, action, entity, entity_id, payload(json), ip, user_agent, created_at.
+	•	backups_index (opcional): metadados de backups existentes.
+
+9.5 Componentes
+	•	Livewire: AuditLogs/AuditLogViewer, Settings/BackupLogs.
+
+⸻
+
+10) Segurança, Permissões e Escopo
+
+10.1 Diretrizes
+	•	Spatie Roles: admin, coordenador, profissional, secretaria.
+	•	Policies: por modelo (Patient, Appointment, Evolution, Assessment, etc.).
+	•	ScopeUnit Middleware: filtra queries por unidade (Admin ignora).
+	•	Validação server-side: Form Requests para todos os forms.
+	•	Sanitização: conteúdo rico higienizado antes de salvar/exibir.
+	•	CSRF: nativo; Rate-limit em login (Breeze).
+	•	LGPD: mínimo necessário; documentos em storage/app/public/unit_{id}/....
+
+⸻
+
+11) Interações, Acessibilidade e UX Writing
+
+11.1 Micro-interações
+	•	Toasts/sucesso/erro: canto inferior direito.
+	•	wire:loading: botões com spinner; skeletons em listas.
+	•	Tooltips: ícones de ajuda com descrições.
+	•	Command Palette (Ctrl+K): buscar paciente, agendamento, relatório, unidade.
+	•	Modo Foco/Leitura: oculta sidebar/header para ler prontuário/relatório.
+
+11.2 Acessibilidade
+	•	Contraste alto (dark mode opcional).
+	•	Navegação por teclado; aria-label nos botões ícone.
+	•	Tamanho de fonte e espaçamento ajustáveis em Preferências.
+
+11.3 UX Writing (exemplos)
+	•	“Bem-vindo(a) de volta 👋”
+	•	“Nenhum agendamento para hoje.”
+	•	“Rascunho salvo às 14:32.”
+	•	“Avaliação finalizada e assinada.”
+
+⸻
+
+12) Deploy & Operação
+
+12.1 Hostinger (PHP + MySQL)
+	•	PHP 8.3, MySQL 8, extensões padrão.
+	•	Setup:
+
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate --seed
+php artisan storage:link
+npm ci && npm run build
+php artisan optimize
+
+
+	•	Cron: php artisan schedule:run a cada minuto.
+	•	Logs: storage/logs, rota/Admin para visualizar últimos erros.
+
+⸻
+
+13) Roadmap de Geração (para Cursor)
+	1.	Fundação: Models + Migrations (User/Role/Unit/Patient/Appointment/Evolution/Assessment/Settings/Logs).
+	2.	Policies + Middleware: ScopeUnit, policies por modelo, seeds de roles.
+	3.	Layout base: layouts Blade, sidebar (relógio + seletor unidade), header.
+	4.	Dashboard: cards e gráficos.
+	5.	Agenda: Calendar + AppointmentModal + Filters + EventCard + validações.
+	6.	Pacientes: CRUD + Profile + Documents + Timeline.
+	7.	Evoluções: criação automática on “Concluído”, editor, rascunho/finalizar/revisar, PDF.
+	8.	Avaliações: templates (Filament), form builder, preenchimento, PDF.
+	9.	Relatórios: gerador + exports.
+	10.	Configurações: perfil, aparência, branding, unidades/usuários, backups.
+	11.	Chat: Chatify adaptado (polling), admin auditor.
+	12.	Logs & Backups: viewers + comandos agendados.
+	13.	Refino UX: command palette, favoritos, tooltips, modos.
+	14.	Teste & Seeds: usuários demo, dados fictícios por unidade.
+
+⸻
+
+14) Anexos de Implementação (snippets “guia”)
+
+14.1 Clique em slot → modal com auto-preenchimento
+
+// Agenda/Calendar.php (Livewire)
+public function openModal($date = null, $time = null) {
+    $date = $date ?? now()->toDateString();
+    $start = $time ?? now()->format('H:i');
+    $end   = \Carbon\Carbon::parse($start)->addMinutes(config('system.default_duration', 60))->format('H:i');
+
+    $this->dispatch('show-appointment-modal', date: $date, start: $start, end: $end);
+}
+
+14.2 Recalcular fim ao alterar início
+
+// Agenda/AppointmentModal.php (Livewire)
+public function updatedStartTime() {
+    if ($this->autoDuration) {
+        $this->end_time = \Carbon\Carbon::parse($this->start_time)
+            ->addMinutes(config('system.default_duration', 60))
+            ->format('H:i');
+    }
+}
+
+14.3 Policy resumida (ex.: PatientPolicy)
+
+public function view(User $user, Patient $patient) {
+    if ($user->hasRole('admin')) return true;
+    if ($user->hasRole('coordenador') || $user->hasRole('secretaria')) {
+        return $user->unit_id === $patient->unit_id;
+    }
+    if ($user->hasRole('profissional')) {
+        return $user->unit_id === $patient->unit_id
+            || $patient->evolutions()->where('professional_id', $user->id)->exists();
+    }
+    return false;
+}
+
+14.4 Chatify sem Pusher (Polling)
+	•	Substituir listeners de Pusher por wire:poll.3s no componente de mensagens:
+
+<div wire:poll.3s="fetchMessages">
+  @foreach($messages as $m)
+    <x-chat.message :msg="$m" />
+  @endforeach
+</div>
+
+
+⸻
+
+15) Critérios de Aceite (DoD – Definition of Done)
+	•	Sem APIs externas: toda funcionalidade opera localmente.
+	•	Admin vê tudo: unidades, agendas, mensagens, relatórios, logs.
+	•	Agenda: criar em 1 clique (auto data/hora + duração), leitura imediata (profissional/paciente/horário).
+	•	Evoluções: criadas automaticamente, rascunho + finalização + revisão.
+	•	Avaliações: templates somente admin; preenchimento pelos demais; assinatura confirmatória.
+	•	Relatórios: filtros salvos, exportações locais.
+	•	Configurações: branding, aparência, unidades/usuários, backups.
+	•	Chat: Chatify com polling; Admin auditor.
+	•	Acessibilidade: navegação por teclado, contraste, tooltips.
+	•	Backups: diários com restauração via UI.
+	•	Logs: ações e logins com IP e user agent.
+
+⸻
+
+Blueprint_SynapsePlus_Arquitetura_v1.0.md
+
+Sistema: Synapse+ (white-label) • Stack: Laravel 11 (PHP 8.3) + Filament 3 + Livewire 3 + TailwindCSS + MySQL 8
+Arquitetura: Monólito modular, offline-ready, zero APIs externas, polling leve onde necessário
+Autor: João Victor Gonzalez Pawlowicz • Data: Nov/2025
+
+EN quick note: This is the technical & engineering architecture manual for Synapse+. It maps layers, folders, flows, policies, middleware, events, performance, backups, deploy and testing so an AI agent (Cursor Pro) can scaffold, implement and maintain the system reliably.
+
+⸻
+
+1) Princípios de Arquitetura
+
+PT-BR:
+	•	Monólito modular com boundaries claros (pastas / namespaces por domínio).
+	•	Segurança por padrão: Policies + Middleware de escopo por unidade; validação server-side (Form Requests).
+	•	UX responsiva e acessível: Livewire 3 (lazy & navigate), Tailwind, WCAG.
+	•	Autonomia total: sem Pusher, sem Google APIs, sem serviços de terceiros.
+	•	Observabilidade local: logs, auditoria de ações, health checks, backups diários.
+	•	Simplicidade inteligente: polling leve (3–120s) em pontos críticos (Chat/Agenda), nada de WebSockets externos.
+
+EN: Modular monolith, secure-by-default, no external services, predictable polling, strong observability and backups.
+
+⸻
+
+2) Estrutura de Pastas (Laravel + Filament + Livewire)
+
+app/
+  Console/
+    Commands/
+      BackupRunCommand.php
+      BackupPruneCommand.php
+      HealthCheckCommand.php
+    Kernel.php
+  Events/
+    AppointmentCompleted.php
+    EvolutionFinalized.php
+  Exceptions/
+  Http/
+    Controllers/
+      Auth/
+      DashboardController.php
+    Livewire/
+      Agenda/
+        Calendar.php
+        AppointmentModal.php
+        FilterSidebar.php
+        EventCard.php
+      Patients/
+        PatientList.php
+        PatientProfile.php
+        PatientDocuments.php
+      Evolutions/
+        EvolutionEditor.php
+        PendingEvolutions.php
+      Assessments/
+        AssessmentFormBuilder.php
+        PatientAssessments.php
+      Reports/
+        ReportGenerator.php
+      Settings/
+        UserPreferences.php
+        UnitManagement.php
+        UserManagement.php
+        SystemBranding.php
+        BackupLogs.php
+      Chat/
+        ChatRoom.php
+        MessageInput.php
+      AuditLogs/
+        AuditLogViewer.php
+      Common/
+        SidebarUnitSwitcher.php
+    Middleware/
+      Authenticate.php
+      ScopeUnit.php
+      EnsureRole.php
+    Requests/
+      Auth/LoginRequest.php
+      PatientStoreRequest.php
+      AppointmentStoreRequest.php
+      EvolutionStoreRequest.php
+      AssessmentStoreRequest.php
+  Listeners/
+    CreateEvolutionOnAppointmentCompleted.php
+    LogModelChanges.php
+  Models/
+    User.php
+    Profile.php
+    Unit.php
+    Room.php
+    Appointment.php
+    AppointmentCategory.php
+    Patient.php
+    PatientDocument.php
+    PatientTimelineEvent.php
+    Evolution.php
+    EvolutionAddendum.php
+    Assessment.php
+    AssessmentTemplate.php
+    Message.php
+    AuditLog.php
+    SystemSetting.php
+    UserPreference.php
+    ProfessionalSchedule.php
+  Notifications/ (opcional p/ e-mails internos locais)
+  Policies/
+    PatientPolicy.php
+    AppointmentPolicy.php
+    EvolutionPolicy.php
+    AssessmentPolicy.php
+  Providers/
+    AppServiceProvider.php
+    AuthServiceProvider.php
+    EventServiceProvider.php
+  Services/
+    ReportService.php
+    BackupService.php
+    HealthService.php
+bootstrap/
+config/
+database/
+  factories/
+  migrations/
+  seeders/
+    RolesAndAdminSeeder.php
+    DemoDataSeeder.php
+public/
+resources/
+  css/
+  js/
+  views/
+    layouts/
+      app.blade.php
+      guest.blade.php
+    components/
+      agenda/
+        event-card.blade.php
+        legend.blade.php
+      common/
+        kpi.blade.php
+        card.blade.php
+        table.blade.php
+        timeline.blade.php
+    dashboard/
+    agenda/
+    patients/
+    evolutions/
+    assessments/
+    reports/
+    settings/
+    chat/
+    logs/
+routes/
+  web.php
+  filament.php (separar rotas do admin)
+storage/
+tests/
+
+EN: Domain-oriented Livewire components; controllers are minimal; business logic in Services and Listeners; Policies for every sensitive model.
+
+⸻
+
+3) Modelos, Relacionamentos e Mapeamento de Tabelas
+
+3.1 Núcleo Operacional
+	•	Unit 1-N Room
+	•	Unit 1-N User (via unit_id principal; usuários podem ter múltiplas unidades via pivot opcional se necessário)
+	•	User (profissional) 1-N Appointment
+	•	Patient 1-N Appointment
+	•	Appointment 1-1 Evolution (criada ao concluir)
+	•	Patient 1-N Evolution, 1-N Assessment, 1-N PatientDocument, 1-N PatientTimelineEvent
+
+3.2 Mensageria Interna
+	•	Message: sender_id, receiver_id|null, unit_id|null, content, attachments(json)
+	•	Admin enxerga tudo; coordenador/usuários enxergam conforme unidade e participante.
+
+3.3 Configurações e Preferências
+	•	SystemSetting (chave-valor ou colunas diretas)
+	•	system_name, logo_path, primary_color, status, status_message, version
+	•	UserPreference: tema, default_unit_id, agenda_default_view, professional_color
+
+EN: Keep casts where helpful (json, array); add composite indexes for frequent filters (unit_id, professional_id, start_at).
+
+⸻
+
+4) Middleware & Escopos
+	•	ScopeUnit
+	•	Se Admin: ignora escopo.
+	•	Outros: injeta current_unit_id da sessão e força scope em consultas sensíveis (Agenda, Pacientes, Evoluções, Avaliações, Mensagens).
+	•	Estratégia: global scopes por modelo (quando aplicável) ou Services que sempre exigem unit_id.
+	•	EnsureRole
+	•	Verifica papéis mínimos por rota (ex.: /filament só Admin).
+
+EN: Prefer service-level scoping over heavy global scopes to keep queries explicit in Livewire components.
+
+⸻
+
+5) Autorização (Policies) & Permissões (Spatie)
+	•	Roles: admin, coordenador, profissional, secretaria.
+	•	Policies por modelo:
+	•	PatientPolicy: admin full; coord/sec = unidade; profissional = unidade ou relação clínica.
+	•	AppointmentPolicy: coord/sec/admin (unidade) CRUD; profissional CRUD apenas dos seus.
+	•	EvolutionPolicy: autor (profissional) edita até finalizar; coord/admin revisam; leitura conforme unidade/autor.
+	•	AssessmentPolicy: admin/coord (unidade) leitura geral; profissional apenas suas avaliações; admin cria Templates.
+	•	Spatie (permissions granulares) para telas/ações específicas quando necessário (ex.: view-reports, manage-users).
+
+EN: Register policies in AuthServiceProvider. Use @can/Gate::allows inside Blade/Livewire to keep UI consistent.
+
+⸻
+
+6) Eventos & Listeners (Domínio)
+	•	Evento: AppointmentCompleted → Listener: CreateEvolutionOnAppointmentCompleted
+	•	Cria Evolution status=pendente, vincula patient_id, professional_id, unit_id.
+	•	Evento: EvolutionFinalized → Listener: LogModelChanges (gera entrada de auditoria e PatientTimelineEvent).
+	•	Modelo Observers: auditar created/updated/deleted em Patient, Appointment, Evolution, Assessment.
+
+EN: Decouple side-effects (audit, timeline, counters) from Livewire with Events & Listeners.
+
+⸻
+
+7) Services (Regras de Negócio)
+	•	ReportService
+	•	KPIs: produtividade por profissional, frequência por paciente, no-show rate, evoluções pendentes.
+	•	Saídas prontas p/ gráficos (arrays consumíveis por Chart.js).
+	•	BackupService
+	•	Execução do dump MySQL + compactação do storage
+	•	Indexação local de backups, exclusão por retenção (ex.: 14/30 dias).
+	•	HealthService
+	•	Checks de DB, disco, permissões, fila, schedule (para exibir na Landing/Status).
+
+EN: Services are stateless, injected where needed (or resolved in Livewire).
+
+⸻
+
+8) Livewire & Filament – Integração e Fronteira
+	•	Filament (Admin-only):
+	•	CRUD de Users, Units, Rooms, AssessmentTemplates, SystemSetting, Backups.
+	•	Impersonate plugin (Admin).
+	•	Bloquear acesso por Middleware EnsureRole:admin.
+	•	Livewire (App do usuário):
+	•	Agenda, Pacientes, Evoluções, Avaliações, Relatórios, Chat, Configurações pessoais.
+	•	Preferir Livewire.navigate p/ transições sem refresh; wire:poll pontual (chat/agenda).
+
+EN: Keep Admin panel isolated (route group) and slim. Move complex domain UX to Livewire app.
+
+⸻
+
+9) Fluxos de Dados (principais)
+
+9.1 Agenda → Evolução
+	1.	Appointment status=concluido
+	2.	Evento AppointmentCompleted
+	3.	Listener cria Evolution(pendente) + PatientTimelineEvent
+	4.	Profissional preenche & finaliza (gera PDF opcional)
+	5.	Coordenador revisa (marca revisada)
+
+9.2 Avaliações (Templates → Preenchimento)
+	1.	Admin cria AssessmentTemplate (Filament)
+	2.	Profissional cria Assessment p/ paciente (autosave)
+	3.	Finaliza (assinatura confirmatória) → bloqueia edição
+	4.	Entra na timeline
+
+9.3 Relatórios
+	•	ReportService agrega por período/unidade/profissional; exporta PDF/CSV.
+
+⸻
+
+10) Lógica de Agenda Inteligente (detalhe técnico)
+	•	Clique em slot vazio:
+	•	date = hoje (ou data do slot), start_time = clicada, end_time = start + default_duration(60min)
+	•	Usuário pode alterar fim/início; recalcular automático quando autoDuration=true.
+	•	Validações:
+	•	Regra end > start
+	•	Checagem de sobreposição por (professional_id, unit_id, start_at … end_at)
+	•	Bloqueio de horários pela ProfessionalSchedule e feriados da Unit.
+	•	Persistência de Filtros:
+	•	session('agenda_filters') + localStorage p/ view preferida (dia/semana/mês/lista).
+
+EN: See Part 2 for UX; this section locks the server-side rules.
+
+⸻
+
+11) Desempenho, Cache e Índices
+	•	MySQL Índices recomendados:
+	•	appointments(unit_id, professional_id, start_at)
+	•	evolutions(unit_id, professional_id, patient_id, status)
+	•	assessments(unit_id, patient_id, professional_id)
+	•	messages(unit_id, sender_id, receiver_id, created_at)
+	•	Cache leve (cache()):
+	•	SystemSetting (branding/cores/status)
+	•	Listas estáveis (especialidades, categorias de atendimento)
+	•	Paginadores & lazy:
+	•	Tabelas grandes (Pacientes, Evoluções) com ->paginate(25)
+	•	Livewire: wire:init, lazy para gráficos/kpis.
+
+EN: Use database indexes aggressively; keep UI snappy via pagination + lazy hydration.
+
+⸻
+
+12) Logs, Auditoria e Backups
+	•	AuditLog: user_id, action, entity, entity_id, payload(json), ip, user_agent
+	•	Gravado por Observers + Listeners.
+	•	Backups (Commands + Schedule):
+	•	php artisan backup:run (dump + zip)
+	•	php artisan backup:prune --days=30
+	•	Listagem via Livewire Settings/BackupLogs (baixar/restaurar).
+	•	Health checks: php artisan health:check + exibir na Landing.
+
+EN: Everything local, downloadable by Admin, no third-party storage required.
+
+⸻
+
+13) Segurança & LGPD
+	•	Policies em todas as operações sensíveis; @can nas Views.
+	•	ScopeUnit obrigatório (exceto Admin).
+	•	Sanitização (HTML) nos campos ricos (Evolution/Assessment) — biblioteca de purifier ou strip_tags + whitelist de tags.
+	•	Uploads para storage/app/public/unit_{id}/... com links simbólicos; validar tipos MIME.
+	•	Login com rate limit (Breeze), CSRF ativo.
+	•	Exportações geradas on-demand e apagadas após download (se temporárias).
+
+EN: Minimal data principle, strong policies, and unit segmentation to avoid cross-tenant leaks.
+
+⸻
+
+14) Acessibilidade & UX Consistente
+	•	WCAG: contraste, foco visível, labels ARIA, navegação por teclado.
+	•	Componentes padronizados: <x-card>, <x-kpi>, <x-table>, <x-timeline>, <x-modal>.
+	•	Mensagens: toasts claros (sucesso/erro/aviso), skeletons em listas e gráficos.
+
+EN: Reuse Blade components for consistent semantics and accessibility.
+
+⸻
+
+15) Variáveis de Ambiente & Configuração
+
+.env mínimo:
+
+APP_NAME=SynapsePlus
+APP_ENV=production
+APP_KEY=...
+APP_URL=https://example.com
+APP_LOCALE=pt_BR
+APP_FALLBACK_LOCALE=pt_BR
+
+LOG_CHANNEL=stack
+LOG_LEVEL=info
+
+DB_CONNECTION=mysql
+DB_HOST=localhost
+DB_PORT=3306
+DB_DATABASE=synapse
+DB_USERNAME=...
+DB_PASSWORD=...
+
+FILESYSTEM_DISK=public
+
+# Polling (segundos)
+CHAT_POLL_INTERVAL=3
+AGENDA_POLL_INTERVAL=120
+
+# Duração padrão (minutos)
+APPOINTMENT_DEFAULT_DURATION=60
+
+EN: Keep intervals configurable; default safe for shared hosting.
+
+⸻
+
+16) Seeds & Dados de Demonstração
+	•	RolesAndAdminSeeder: cria roles, Admin e Unidade “Principal”.
+	•	DemoDataSeeder (opcional em dev):
+	•	Profissionais, pacientes, 2–3 salas, 20 agendamentos, 5 evoluções, 2 avaliações.
+
+EN: Provide realistic data for UI verification and demo.
+
+⸻
+
+17) Testes (Pest/Laravel)
+	•	Feature:
+	•	Auth + Policies (acessos por role)
+	•	ScopeUnit (não Admin)
+	•	Fluxo Agenda→Evolução (evento + listener)
+	•	Assessment (template → preenchimento → finalização)
+	•	Unit:
+	•	ReportService (agregações)
+	•	BackupService (nomes/retenção)
+	•	HealthService (checks)
+
+EN: Prioritize critical path tests; smoke tests for Livewire components mounting.
+
+⸻
+
+18) Deploy (Hostinger) & Operação
+
+18.1 Build
+
+composer install --no-dev --optimize-autoloader
+cp .env.example .env
+php artisan key:generate
+php artisan migrate --seed
+php artisan storage:link
+npm ci && npm run build
+php artisan optimize
+
+18.2 Cron & Schedule
+	•	Configurar cron minutely: * * * * * php /path/artisan schedule:run >> /dev/null 2>&1
+
+18.3 Permissões
+	•	storage/ e bootstrap/cache/ graváveis.
+
+18.4 Observabilidade local
+	•	Página de Status (Landing) puxando HealthService.
+	•	Viewer de logs/admin e de backups.
+
+EN: Shared hosting friendly; no supervisor/queues required for base features.
+
+⸻
+
+19) Convenções de Código
+	•	PSR-12, strict types onde aplicável.
+	•	Nomeação:
+	•	Models no singular (Patient), Policies por entidade (PatientPolicy)
+	•	Livewire em App\Http\Livewire\{Domínio}\{Componente}
+	•	Requests SomethingStoreRequest / SomethingUpdateRequest
+	•	Commits: convencionais (feat:, fix:, chore:…).
+	•	Traduções: lang/pt_BR/*.php para mensagens de validação e UI.
+
+EN: Keep domain folders clean; avoid god classes; prefer small services.
+
+⸻
+
+20) Blueprints de Implementação (AI-friendly)
+
+20.1 Geração em Ordem (Cursor)
+	1.	Migrations + Models base (User/Unit/Patient/Appointment/…)
+	2.	Policies + Seeds (roles/admin)
+	3.	Middleware (ScopeUnit, EnsureRole) e rota de seleção de unidade
+	4.	Layout base (app/guest), Sidebar (relógio + switcher), Header
+	5.	Dashboard (cards estáticos → serviços)
+	6.	Agenda (Calendar + Modal + Filters + EventCard) + validações
+	7.	Pacientes (CRUD + Profile + Documents + Timeline)
+	8.	Evoluções (evento concluído → criação pendente; Editor + Pending)
+	9.	Avaliações (Templates Filament + Form Builder + Preenchimento)
+	10.	Relatórios (ReportService + exports)
+	11.	Configurações (Branding, Aparência, Unidades/Usuários, Backups)
+	12.	Chat (Chatify adaptado a polling)
+	13.	Logs/Auditoria/Backups (commands + UI)
+	14.	Testes básicos + dados demo
+
+20.2 Snippets críticos
+
+Auto-preencher fim = início + duração padrão
+
+$minutes = (int) (config('system.default_duration') ?? env('APPOINTMENT_DEFAULT_DURATION', 60));
+$this->end_time = \Carbon\Carbon::parse($this->start_time)->addMinutes($minutes)->format('H:i');
+
+Checar sobreposição
+
+Appointment::where('unit_id', $unitId)
+  ->where('professional_id', $professionalId)
+  ->where(function($q) use ($start, $end) {
+      $q->whereBetween('start_at', [$start, $end])
+        ->orWhereBetween('end_at', [$start, $end])
+        ->orWhere(function($q2) use ($start, $end) {
+            $q2->where('start_at', '<=', $start)->where('end_at', '>=', $end);
+        });
+  })->exists();
+
+Evento → Listener
+
+// fire
+AppointmentCompleted::dispatch($appointment);
+
+// listener
+public function handle(AppointmentCompleted $e) {
+  Evolution::firstOrCreate([
+     'appointment_id' => $e->appointment->id,
+  ], [
+     'unit_id' => $e->appointment->unit_id,
+     'patient_id' => $e->appointment->patient_id,
+     'professional_id' => $e->appointment->professional_id,
+     'status' => 'pendente',
+  ]);
+}
+
+Polling no Chat (Livewire)
+
+<div wire:poll.{{ env('CHAT_POLL_INTERVAL', 3) }}s="fetchMessages">
+  @foreach($messages as $m)
+    <x-chat.message :msg="$m"/>
+  @endforeach
+</div>
+
+
+⸻
+
+21) Saúde, Manutenibilidade e Planejamento Futuro
+	•	HealthService visível na Landing (status do sistema), útil para manutenção planejada.
+	•	Retenção de backups configurável (env).
+	•	Sincronização leve: jobs locais (fila sync) para tarefas curtas; nada assíncrono crítico.
+	•	Refino incremental: habilitar drag-select na agenda, salvar filtros favoritos, dashboard modular por usuário.
+
+EN: The system is intentionally simple to host and maintain, yet feature-complete for clinics with multi-unit operations.
+
+Deploy in vps: Ferramentas que Simplificam o Deploy em uma VPS (e que você não conseguiria em hospedagem compartilhada):
+Embora você possa fazer tudo manualmente em uma VPS, existem painéis de controle e serviços que tornam o gerenciamento e o deploy Laravel incrivelmente mais fáceis:
+
+Laravel Forge / Ploi.io / SpinupWP:
+Provisionamento Automatizado: Você aponta para sua VPS (DigitalOcean, Vultr, AWS, etc.), e eles instalam e configuram automaticamente o Nginx, PHP-FPM, MySQL, Composer, Git, SSL (Let's Encrypt), cron jobs, etc., tudo otimizado para Laravel.
+Deploy com Git: Você conecta seu repositório Git (GitHub, GitLab, Bitbucket). Para fazer um deploy, basta fazer um git push para sua branch principal, e essas ferramentas puxam o código, rodam composer install, php artisan migrate, npm run build (se configurado) e recarregam o PHP-FPM, tudo automaticamente.
+Gerenciamento Simplificado: Painéis de controle web para gerenciar bancos de dados, chaves SSH, variáveis de ambiente, logs, agendamentos (cron jobs), e até monitoramento básico.
+Zero Downtime Deployment (opcional): Ferramentas como Forge oferecem a opção de deploy sem tempo de inatividade, o que é ótimo para sistemas em produção.
+
+# Blueprint_SynapsePlus_DesignSystem_v1.0.md
+
+## 🎨 Introdução
+O *Synapse+* possui um Design System totalmente integrado à stack *Laravel + Filament + Livewire*, projetado para oferecer uma experiência visual coerente, acessível e eficiente.
+Este documento define todos os fundamentos visuais, componentes reutilizáveis, padrões de interface e diretrizes de usabilidade.
+
+---
+
+## 🧱 1. Fundamentos de Design
+
+### 1.1 Cores Principais
+| Nome | Hex | Uso |
+|------|-----|-----|
+| Azul Confiança | #004684 | Cor primária principal (botões, links, ênfases) |
+| Azul Acolhimento | #277200 | Destaques e interações secundárias |
+| Laranja Amor | #B70D04 | Ações importantes, estados de atenção |
+| Amarelo Alegria | #F2E20F | Feedbacks positivos, sucesso |
+| Verde Tranquilidade | #01873B | Elementos confirmatórios e status ok |
+| Cinza Transparência | #C5C8C8 | Backgrounds neutros e divisões visuais |
+
+#### Tons neutros
+| Nome | Hex | Uso |
+|------|-----|-----|
+| Branco | #FFFFFF | Fundo principal |
+| Cinza claro | #F5F5F5 | Backgrounds alternados |
+| Cinza médio | #E5E5E5 | Bordas e separadores |
+| Cinza escuro | #333333 | Texto principal e ícones |
+
+### 1.2 Tipografia
+- *Fonte principal:* Inter (Sans-serif moderna e legível)
+- *Peso:* 400 regular / 600 semibold / 700 bold  
+- *Escalas de tamanho:*  
+  - H1: 32px  
+  - H2: 24px  
+  - H3: 18px  
+  - Corpo: 16px  
+  - Pequeno: 14px  
+
+### 1.3 Grid e espaçamento
+- Base: 4px  
+- Margens e paddings múltiplos de 8px  
+- Layout fluido com max-width: 1440px  
+- Colunas de 12 unidades (para dashboards e relatórios)
+
+### 1.4 Bordas e sombras
+- Raio padrão: 0.5rem  
+- Sombra leve: 0 2px 4px rgba(0,0,0,0.1)  
+- Sombra média: 0 4px 10px rgba(0,0,0,0.15)
+
+### 1.5 Ícones
+- Sistema *Lucide Icons*, renderizados via Blade <x-icon name="edit"/>  
+- Tamanho padrão: 18px  
+- Cores herdam do contexto (currentColor)
+
+---
+
+## 🧩 2. Componentes UI Reutilizáveis
+
+### 2.1 Botões
+- *Primário:* Azul Confiança, texto branco  
+- *Secundário:* Branco com borda azul  
+- *Perigo:* Laranja Amor, texto branco  
+- *Desabilitado:* Cinza médio, cursor bloqueado  
+
+Estados: hover, focus, active, disabled  
+Feedback: ripple leve (CSS) + wire:loading spinner
+
+### 2.2 Inputs e formulários
+- Campos arredondados, borda 1px solid #E5E5E5  
+- Label sempre acima do campo  
+- Placeholder descritivo  
+- Mensagens de erro em vermelho (#B70D04)  
+- Campos obrigatórios com asterisco *
+
+Componentes Blade:
+blade
+<x-form.input label="Nome do paciente" wire:model="patient.name" required />
+<x-form.select label="Profissional" :options="$professionals" />
+<x-form.textarea label="Observações" rows="3" />
+
+
+### 2.3 Cards e métricas
+- Usados em dashboards e relatórios  
+- Estrutura: título, valor, ícone  
+- Opções de cor por contexto (ex.: success, warning, info)  
+
+blade
+<x-card metric title="Atendimentos do dia" value="32" icon="calendar" color="primary" />
+
+
+### 2.4 Tabelas
+- Cabeçalho com cor neutra (#F5F5F5)  
+- Linhas alternadas (:nth-child(even))  
+- Ícones de ação à direita (editar, excluir, visualizar)
+
+Paginação padrão: 25 registros / Lazy loading habilitado
+
+### 2.5 Modais
+- Fundo semitransparente (rgba(0,0,0,0.4))  
+- Container centralizado (max-width: 700px)  
+- Botões padrão: “Salvar”, “Cancelar”  
+- Fechamento com tecla Esc ou clique fora
+
+### 2.6 Tooltips e popovers
+- Tooltip: fundo preto 80% opacidade, texto branco  
+- Popovers: usados em listas e configurações rápidas  
+
+### 2.7 Timeline (Linha do Tempo do Paciente)
+- Estrutura vertical com pontos coloridos por tipo de evento  
+- Tipos: evolução, avaliação, documento, nota  
+- Cada item mostra data, autor e resumo
+
+blade
+<x-timeline :events="$patient->timelineEvents" />
+
+
+### 2.8 Alertas e toasts
+- success: verde claro + ícone check  
+- error: vermelho + ícone x  
+- info: azul claro + ícone info  
+- warning: amarelo + ícone alerta
+
+---
+
+## 🧭 3. Layouts Principais
+
+### 3.1 Sidebar
+- Lateral esquerda fixa  
+- Ícones + labels colapsáveis  
+- Exibe *relogio dinâmico* e *dropdown de unidade*  
+- Cores por função (active = Azul Confiança)
+
+Itens principais:
+- Dashboard  
+- Agenda  
+- Pacientes  
+- Evoluções  
+- Avaliações  
+- Relatórios  
+- Chat  
+- Configurações  
+
+### 3.2 Header
+- Barra superior fixa  
+- Exibe nome do usuário e avatar  
+- Botão de logout + menu rápido (Ajuda / Perfil)  
+- Campo de busca global (filtra pacientes/agendamentos)
+
+### 3.3 Dashboard
+- Cards métricos (atendimentos, evoluções pendentes, pacientes ativos)  
+- Gráficos de barras e pizza (Chart.js)  
+- Link rápido para agenda e relatórios
+
+### 3.4 Agenda
+- Modos de visualização: dia, semana, mês, lista  
+- Drag & drop para alterar horários  
+- Cada profissional com cor personalizada  
+- Clique em horário → abre modal pré-preenchido com data/hora atuais  
+
+### 3.5 Pacientes
+- Lista filtrável com busca por nome, tag ou unidade  
+- Perfil detalhado → abas: dados, documentos, linha do tempo  
+- Upload de arquivos (PDF, JPG, PNG)
+
+### 3.6 Evoluções
+- Exibição pendente/concluída/finalizada  
+- Editor com autosave e rascunho  
+- Campo de assinatura digital simples (confirmação textual)  
+- Exportação PDF
+
+### 3.7 Avaliações
+- Builder de formulário (arrastar e soltar campos)  
+- Templates personalizados por especialidade  
+- Avaliações salvas na timeline do paciente
+
+### 3.8 Relatórios
+- Filtros por unidade, profissional e período  
+- Exportação em PDF/CSV  
+- Gráficos de desempenho e frequência  
+
+### 3.9 Configurações
+- Perfil de usuário (nome, conselho, senha)  
+- Preferências (tema, agenda padrão)  
+- Gestão de unidades e usuários (somente admin)  
+- Personalização visual (nome do sistema, logo, cores)
+
+### 3.10 Chat Interno
+- Interface simples (Chatify adaptado)  
+- Polling via Livewire a cada 3s  
+- Admin visualiza todas as conversas  
+- Mensagens agrupadas por usuário e unidade  
+
+### 3.11 Logs e Auditoria
+- Tabela com data, usuário, ação e entidade  
+- Filtros por tipo e período  
+- Exportação CSV
+
+---
+
+## 💬 4. Estados e Interações
+
+| Estado | Descrição | Comportamento |
+|---------|------------|----------------|
+| Hover | Cursor sobre elemento | Elevação leve e cor mais intensa |
+| Focus | Campo ativo | Borda azul Confiança 2px |
+| Active | Clique pressionado | Sombra reduzida e cor escura |
+| Disabled | Campo/botão inativo | Cinza claro e cursor bloqueado |
+| Loading | Ação em processamento | Spinner + texto “Salvando...” |
+| Empty | Listas ou dados vazios | Ícone + texto “Nenhum registro encontrado” |
+
+### Microinterações
+- *Agenda:* destaque animado no slot clicado.  
+- *Formulários:* auto focus no primeiro campo com erro.  
+- *Chat:* rolagem automática para a última mensagem.  
+- *Notificações:* som opcional e fade-out suave.  
+
+---
+
+## ♿ 5. Acessibilidade (WCAG 2.2)
+- Contraste mínimo 4.5:1  
+- Labels visíveis em todos os campos  
+- Teclas de atalho: Ctrl + / abre busca global  
+- Navegação por teclado habilitada (tabindex consistente)  
+- Feedback textual sempre presente (não só cores)  
+
+---
+
+## 🪶 6. UX Writing (Textos e Mensagens)
+
+### 6.1 Mensagens padrão
+- “Tudo certo! Suas alterações foram salvas.”  
+- “Verifique os campos obrigatórios antes de prosseguir.”  
+- “Nenhum agendamento encontrado para hoje.”  
+- “Ops! Ocorreu um erro inesperado.”  
+- “Deseja realmente excluir este registro?”  
+
+### 6.2 Microcopy de botões
+| Ação | Texto |
+|------|-------|
+| Salvar | “Salvar alterações” |
+| Criar | “Adicionar novo” |
+| Editar | “Editar registro” |
+| Excluir | “Remover permanentemente” |
+| Cancelar | “Cancelar e voltar” |
+
+### 6.3 Tonalidade
+- Linguagem acolhedora e clara.  
+- Evitar termos técnicos desnecessários.  
+- Sempre indicar o próximo passo após mensagens de erro.  
+
+---
+
+## 🧬 7. Branding Dinâmico
+
+### 7.1 Personalização via painel Admin
+- Nome do sistema (SystemSetting.system_name)  
+- Logo (upload PNG/SVG)  
+- Cores primárias e secundárias  
+- Status do sistema (Online / Em manutenção)  
+- Mensagem de status exibida na tela de login  
+
+### 7.2 Tela de login (Landing)
+- Logo + nome dinâmicos  
+- Campo de login e senha centralizados  
+- Rodapé com informações de status e versão do sistema  
+- Link para suporte (email configurável)
+
+### 7.3 Modo manutenção
+Quando o status for “Em manutenção”, exibir:
+
+🛠 O sistema está temporariamente em manutenção.
+Por favor, tente novamente em alguns minutos.
+
+Somente Admin pode autenticar durante o modo manutenção.
+
+---
+
+## 📱 8. Layout Responsivo
+
+| Dispositivo | Layout | Detalhes |
+|--------------|---------|----------|
+| Mobile (<768px) | Layout em abas | Sidebar colapsada, header fixo |
+| Tablet (768–1024px) | Sidebar retrátil | Cards em 2 colunas |
+| Desktop (>1024px) | Layout completo | Sidebar fixa + dashboard 3 colunas |
+
+- Navegação simplificada para telas pequenas  
+- Componentes colapsáveis automaticamente  
+- Botão “voltar” visível em todas as telas no mobile
+
+---
+
+## 🧩 9. Exemplos Descritivos de Telas
+
+### Tela: Login
+Layout minimalista centralizado, fundo branco, logo do sistema acima, dois campos (email e senha), botão azul Confiança “Entrar”.  
+Rodapé mostra “Sistema online” ou “Em manutenção”.
+
+### Tela: Dashboard
+Grid 3x2 de cards métricos.  
+Topo com filtros de unidade e período.  
+Cards coloridos e ícones contextuais.
+
+### Tela: Agenda
+Calendário semanal com colunas de profissionais.  
+Eventos coloridos por profissional.  
+Clique → abre modal preenchido.  
+Legenda inferior com cores dos profissionais.
+
+### Tela: Paciente
+Header com nome e status (ativo/inativo).  
+Abas: Dados Gerais, Documentos, Linha do Tempo.  
+Timeline vertical mostrando evoluções e avaliações.  
+
+### Tela: Evolução
+Editor de texto rico com auto salvamento.  
+Botões: Salvar Rascunho / Finalizar.  
+Campo de assinatura digital textual.  
+Ao finalizar → bloqueia edição e registra log.  
+
+### Tela: Avaliação
+Builder com arrastar campos.  
+Preview em tempo real.  
+Botão “Salvar modelo” (Admin) ou “Finalizar avaliação” (Profissional).  
+
+### Tela: Relatórios
+Filtros à esquerda (unidade, profissional, data).  
+Gráfico à direita (barras/pizza).  
+Botão “Exportar PDF”.  
+
+### Tela: Chat
+Janela dividida (lista de contatos + mensagens).  
+Polling automático a cada 3s.  
+Admin vê todas as conversas.  
+
+### Tela: Configurações
+Abas laterais: Perfil / Preferências / Sistema / Backups.  
+Formulários com inputs e selects padronizados.  
+Upload de logo e definição de cor primária.  
+
+---
+
+## 🧭 10. Diretrizes Gerais
+
+- Interface deve ser *autoexplicativa*.  
+- Sempre priorizar *clareza visual e usabilidade*.  
+- Nenhum elemento deve depender exclusivamente de cor.  
+- Todas as telas precisam manter o mesmo layout grid e espaçamentos.  
+- Focar em consistência e fluidez de navegação (sem reloads completos).
+
+---
+
+## ✅ Conclusão
+Este Design System define a linguagem visual e interativa do *Synapse+*, garantindo consistência e acessibilidade.  
+Com ele, o Cursor Pro pode gerar uma interface moderna, acolhedora e 100% alinhada ao propósito do sistema.
+
+Blueprint_SynapsePlus_Funcionalidades_e_Fluxos_v1.1.md
+
+🧭 Introdução
+
+O Synapse+ é um sistema clínico multiunidade e modular, desenvolvido para centralizar a operação de clínicas interdisciplinares com foco em eficiência, acessibilidade e simplicidade.
+Este documento descreve todas as funcionalidades, fluxos, interações, permissões e lógicas internas, com base na versão mais recente de requisitos definidos — sem dependência de APIs externas.
+
+⸻
+
+👥 1. Perfis e Papéis de Usuário
+
+1.1 Papéis e Responsabilidades
+
+Papel	Nível	Descrição	Acesso
+Admin	Global	Gerencia todo o sistema e todas as unidades. Cria usuários, define permissões, configura branding/estado e supervisiona logs/backups.	Acesso completo (todas as unidades)
+Coordenador	Unidade	Supervisiona equipe da unidade, cria/edita pacientes, agenda e relatórios, revisa evoluções.	Escopo da unidade
+Profissional	Individual	Realiza atendimentos, preenche evoluções e avaliações.	Pacientes/atendimentos próprios
+Secretária	Unidade	Organiza agenda e cadastro de pacientes da unidade.	Agenda/pacientes da unidade (sem acesso clínico a evoluções/avaliações)
+
+1.2 Regras de Visualização
+	•	Admin: enxerga tudo (todas as unidades, todos os módulos).
+	•	Coordenador: vê tudo da sua unidade.
+	•	Profissional: vê apenas seus atendimentos e pacientes vinculados.
+	•	Secretária: vê agenda e pacientes da unidade; não vê conteúdo clínico (evoluções/avaliações).
+
+⸻
+
+🧩 2. Módulos Principais e Funcionalidades
+
+2.1 Dashboard
+
+Funções
+	•	Cards informativos: Atendimentos do dia, Evoluções pendentes, Pacientes ativos.
+	•	Gráficos de produtividade (atendimentos por período).
+	•	Acessos rápidos: Agenda, Relatórios.
+	•	Atualização manual (sem tempo real obrigatório).
+
+Visualização
+	•	Admin: visão global (unidades agregadas + filtro de unidade).
+	•	Coordenador: visão da unidade.
+	•	Profissional/Secretária: visão focada no papel.
+
+⸻
+
+2.2 Agenda Inteligente
+
+Funcionalidades
+	•	Modos: dia, semana, mês e lista.
+	•	Filtros: profissional, paciente, sala, status.
+	•	Drag & Drop para ajustar horários.
+	•	Cores por profissional (definidas nas preferências).
+	•	Criação rápida (clique no horário) → modal com:
+	•	Data: hoje por padrão
+	•	Início: horário clicado (ou atual)
+	•	Término: +1h automática (editável)
+	•	Paciente e profissional: obrigatórios
+	•	Bloqueio de dias/feriados configuráveis por unidade.
+	•	Agenda unificada para Admin/Coordenador; individual para Profissional.
+
+Regras
+	•	Secretária: cria/edita/exclui agendamentos da unidade.
+	•	Profissional: cria/edita apenas os seus.
+	•	Coordenador/Admin: acesso total conforme escopo.
+
+Fluxo Automático
+	1.	Atendimento criado → executado →
+	2.	Marcado como concluído →
+	3.	Gera pendência de evolução do profissional responsável.
+
+UX
+	•	Evento mostra paciente + profissional + horário.
+	•	Tooltip exibe detalhes/observações.
+	•	Clique em evento abre edição rápida.
+	•	Legenda de cores por profissional.
+
+⸻
+
+2.3 Pacientes
+
+Funções
+	•	Cadastro mínimo (nome obrigatório) + dados clínicos básicos.
+	•	Upload de documentos (PDF/JPG/PNG).
+	•	Linha do tempo com eventos clínicos e administrativos.
+	•	Exportação de prontuário (PDF consolidado).
+	•	Busca por nome, documento, tag, unidade.
+
+Regras de Acesso
+	•	Profissional: somente pacientes que atende.
+	•	Coordenador/Admin: todos da unidade.
+	•	Secretária: cadastro/visualização básica (sem clínica detalhada).
+
+UX
+	•	Lista filtrável com contadores.
+	•	Perfil com abas: Dados, Documentos, Linha do Tempo.
+	•	Eventos com tipo (ícone/cor): evolução, avaliação, documento, nota.
+
+⸻
+
+2.4 Evoluções
+
+Fluxo
+	1.	Agendamento marcado como concluído → criação automática de evolução pendente.
+	2.	Profissional preenche Relato Clínico, Conduta, Objetivos.
+	3.	Pode Salvar rascunho ou Finalizar (assinatura textual/confirmatória).
+	4.	Ao finalizar: evolução fica bloqueada, adicionada na timeline do paciente.
+
+Funcionalidades
+	•	Busca por paciente e intervalo de datas.
+	•	Exportação PDF (individual).
+	•	Histórico de alterações (quem/quando).
+	•	Coordenador/Admin podem revisar pendências.
+
+UX
+	•	Editor limpo, autosave de rascunho.
+	•	Status claros: rascunho, pendente, finalizada.
+	•	Confirmar antes de finalizar (bloqueio pós-confirmação).
+
+⸻
+
+2.5 Avaliações
+
+Funcionalidade
+	•	Criadas manualmente (não dependem da agenda).
+	•	Iniciadas por Profissional/Coordenador/Admin.
+	•	Baseadas em templates (modelo).
+	•	Campos dinâmicos: texto, número, data, seleção, checkbox.
+	•	Finalização com confirmação textual (sem assinatura complexa).
+	•	Registro na timeline do paciente.
+
+Templates
+	•	Apenas Admin cria/edita modelos no painel administrativo interno.
+
+UX
+	•	Form Builder (arrastar e soltar campos).
+	•	Preview do formulário antes de salvar.
+	•	Evidência de campos obrigatórios.
+
+⸻
+
+2.6 Relatórios
+
+Tipos
+	•	Clínico: evoluções e avaliações consolidadas.
+	•	Frequência: presenças/ausências por paciente.
+	•	Produtividade: atendimentos por profissional.
+
+Funcionalidades
+	•	Filtros: unidade, profissional, paciente, período.
+	•	Exportação: PDF e CSV.
+	•	Visualização com gráficos (barras/pizza) internos.
+
+UX
+	•	Tabelas com filtros e totais.
+	•	Indicadores coloridos (status).
+
+⸻
+
+2.7 Configurações
+
+Submódulos
+
+Aba	Função
+Perfil	Atualizar dados do usuário e senha
+Preferências	Tema claro, cor da agenda, unidade padrão, view padrão (dia/semana/mês/lista)
+Agenda	Bloqueios/feriados, horários de atendimento por profissional
+Unidades (Admin)	CRUD de unidades/salas
+Usuários (Admin)	CRUD e atribuição de permissões/roles
+Sistema (Admin)	Nome, logo, cores, status (online/manutenção) e mensagem
+Backups (Admin)	Exportação de dados e logs, retenção
+
+Destaques
+	•	Troca de unidade pela sidebar (dropdown).
+	•	Admin altera nome/cores do sistema (white-label).
+	•	Modo Manutenção com mensagem exibida no login.
+
+⸻
+
+2.8 Chat Interno (sem API externa)
+
+Descrição
+	•	Mensageria por unidade, sem serviços de terceiros.
+	•	Atualização via polling (ex.: 3s).
+	•	Admin visualiza todas as conversas.
+	•	Conversas 1:1 ou grupos por unidade (simples).
+
+UX
+	•	Lista de contatos à esquerda; mensagens à direita.
+	•	Badge 🔵 para novas mensagens.
+	•	Rolagem automática para a última mensagem.
+
+⸻
+
+2.9 Notificações Internas
+	•	Criadas por Admin/Coordenador.
+	•	Tipos: aviso, lembrete, alerta clínico.
+	•	Exibição em painel e mural.
+	•	Marcadores: lido/não lido.
+	•	Filtros por data, tipo e unidade.
+
+⸻
+
+2.10 Logs e Auditoria
+	•	Registro de todas as ações CRUD (quem/quando/onde).
+	•	Campos: entidade, ação, autor, IP, data/hora.
+	•	Exportação CSV.
+	•	Backup automático diário (base e arquivos).
+	•	Acesso restrito ao Admin.
+
+⸻
+
+🔄 3. Fluxos Lógicos e de Dados
+
+Fluxo A — Agendamento → Evolução
+	1.	Secretária/Profissional cria atendimento.
+	2.	Conclusão do atendimento → gera evolução pendente.
+	3.	Profissional preenche e finaliza a evolução.
+	4.	Evolução é adicionada à timeline do paciente.
+
+Fluxo B — Avaliação Clínica
+	1.	Profissional/Coordenador/Admin inicia avaliação.
+	2.	Preenche conforme template.
+	3.	Finaliza (confirmação textual) → bloqueia edição.
+	4.	Registro vai para timeline.
+
+Fluxo C — Notificação Interna
+	1.	Admin/Coordenador cria notificação.
+	2.	Usuários recebem no painel/mural.
+	3.	Ao marcar lida, remove badge.
+
+Fluxo D — Logs
+	1.	Ação executada → gera log.
+	2.	Admin consulta e exporta quando necessário.
+
+⸻
+
+💡 4. Recursos Inteligentes e Automáticos
+
+Evento	Ação
+Conclusão de atendimento	Cria evolução pendente (por profissional)
+Evolução finalizada	Marca pendência resolvida + timeline
+Avaliação finalizada	Adiciona timeline
+Login	Registra IP + horário (log)
+Mudança de unidade (sidebar)	Atualiza escopo de dados
+Rotina diária	Backup automático (DB + storage)
+
+
+⸻
+
+🎨 5. UX e Navegação
+
+Padrões Gerais
+	•	Layout fixo: sidebar + header.
+	•	Cores neutras e realces funcionais.
+	•	Itens ordenados por frequência de uso.
+	•	Interações rápidas, sem reload total de página.
+
+Landing Page (Login)
+	•	Exibe status do sistema (online/manutenção).
+	•	Mostra logo/nome dinâmicos.
+	•	Campos simples de login; rodapé com versão e suporte.
+
+Sidebar
+	•	Relógio em tempo real.
+	•	Dropdown de unidade (se houver mais de uma).
+	•	Ícones + labels; cor de ativo em destaque.
+
+Responsividade
+	•	Mobile: listas/abas.
+	•	Tablet: grid simplificado.
+	•	Desktop: visual completo.
+
+⸻
+
+⚙ 6. Segurança e Permissões
+	•	Acesso com email/senha; logout explícito.
+	•	Sessão expira após 2h inativas (ajustável).
+	•	Dados escopados por unidade (exceto Admin).
+	•	Todos os eventos sensíveis geram log.
+	•	Backups diários; retenção configurável.
+	•	Assinatura simples (confirmação textual), sem armazenamento de biometria ou chaves externas.
+
+⸻
+
+🚀 7. Melhorias e Extensões Futuras
+	•	Tema escuro opcional.
+	•	Chat de grupo por unidade e threads.
+	•	Pesquisa global instantânea (pacientes/agenda/conteúdo).
+	•	Filtros rápidos e presets salvos por usuário.
+	•	Exportação de relatórios agendada (manual, sem API).
+	•	Indicadores de performance personalizáveis por unidade.
+	•	Favoritos de telas/filtros por usuário.
