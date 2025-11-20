@@ -17,6 +17,10 @@ Documentação completa sobre deploy e configuração em produção.
 
 ### 🏢 Hostinger
 - **[Deploy na Hostinger](deploy/hostinger.md)** - Guia passo a passo completo para deploy na Hostinger
+- **[Deploy via File Manager](deploy/filemanager.md)** - Deploy usando interface visual (sem Git)
+- **[Credenciais Hostinger](deploy/CREDENCIAIS-HOSTINGER.md)** ⭐ - Credenciais já configuradas!
+- **[Criar Banco de Dados](deploy/CRIAR-BANCO-DADOS.md)** - Como criar MySQL na Hostinger
+- **[MySQL Remoto vs Local](deploy/MYSQL-REMOTO-VS-LOCAL.md)** - Qual opção escolher?
 - **[Deploy Automático via Git](deploy/automatico-git.md)** - Configuração de CI/CD e webhooks
 - **[Setup Rápido](deploy/SETUP-RAPIDO.md)** ⚡ - Configure deploy automático em 5 minutos
 

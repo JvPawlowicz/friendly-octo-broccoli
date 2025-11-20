@@ -36,8 +36,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Validar APP_KEY em produção
-        if (app()->environment('production') && empty(config('app.key'))) {
+        // Validar APP_KEY em produção (exceto quando executando key:generate)
+        if (app()->environment('production') 
+            && empty(config('app.key'))
+            && !app()->runningInConsole()
+            && !in_array('key:generate', $_SERVER['argv'] ?? [])) {
             throw new \RuntimeException(
                 'APP_KEY não configurado! Execute: php artisan key:generate'
             );
