@@ -41,4 +41,23 @@ class Atendimento extends Model
     public function evolucao(): HasOne {
         return $this->hasOne(Evolucao::class);
     }
+
+    /**
+     * Scope para filtrar apenas atendimentos que devem ser contados nas estatísticas
+     * Exclui atendimentos com pacientes padrão que têm contar_como_atendimento = false
+     */
+    public function scopeContaveis($query)
+    {
+        return $query->whereHas('paciente', function ($q) {
+            $q->where(function ($subQ) {
+                // Inclui pacientes normais (sem CPF especial)
+                $subQ->where('cpf', '!=', '00000000000')
+                     ->orWhereNull('cpf');
+            })->orWhere(function ($subQ) {
+                // Inclui pacientes padrão que devem contar como atendimento
+                $subQ->where('cpf', '00000000000')
+                     ->where('contar_como_atendimento', true);
+            });
+        });
+    }
 }

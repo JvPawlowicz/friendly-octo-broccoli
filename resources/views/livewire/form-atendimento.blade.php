@@ -26,67 +26,65 @@
 
             <!-- Campos do Formulário -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Paciente *</label>
-                    <select wire:model="pacienteId" wire:change="verificarConflitos" 
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="">Selecione</option>
-                        @foreach($pacientes as $paciente)
-                            <option value="{{ $paciente->id }}">{{ $paciente->nome_completo }}</option>
-                        @endforeach
-                    </select>
-                    @error('pacienteId') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                </div>
+                <x-ui.form-select 
+                    label="Paciente" 
+                    wire:model="pacienteId" 
+                    wire:change="verificarConflitos"
+                    required>
+                    <option value="">Selecione um paciente</option>
+                    @foreach($pacientes as $paciente)
+                        <option value="{{ $paciente->id }}">{{ $paciente->nome_completo }}</option>
+                    @endforeach
+                </x-ui.form-select>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Profissional *</label>
-                    <select wire:model="userId" wire:change="verificarConflitos" 
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="">Selecione</option>
-                        @foreach($profissionais as $prof)
-                            <option value="{{ $prof->id }}">{{ $prof->name }}</option>
-                        @endforeach
-                    </select>
-                    @error('userId') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                </div>
+                <x-ui.form-select 
+                    label="Profissional" 
+                    wire:model="userId" 
+                    wire:change="verificarConflitos"
+                    required>
+                    <option value="">Selecione um profissional</option>
+                    @foreach($profissionais as $prof)
+                        <option value="{{ $prof->id }}">{{ $prof->name }}</option>
+                    @endforeach
+                </x-ui.form-select>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Sala</label>
-                    <select wire:model="salaId" wire:change="verificarConflitos" 
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="">Sem sala (online)</option>
-                        @foreach($salas as $sala)
-                            <option value="{{ $sala->id }}">{{ $sala->nome }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                <x-ui.form-select 
+                    label="Sala" 
+                    wire:model="salaId" 
+                    wire:change="verificarConflitos"
+                    help="Opcional - selecione uma sala específica">
+                    <option value="">Sem sala (online)</option>
+                    @foreach($salas as $sala)
+                        <option value="{{ $sala->id }}">{{ $sala->nome }}</option>
+                    @endforeach
+                </x-ui.form-select>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Status *</label>
-                    <select wire:model="status" 
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="Agendado">Agendado</option>
-                        <option value="Confirmado">Confirmado</option>
-                        <option value="Check-in">Check-in</option>
-                        <option value="Concluído">Concluído</option>
-                        <option value="Cancelado">Cancelado</option>
-                    </select>
-                    @error('status') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                </div>
+                <x-ui.form-select 
+                    label="Status" 
+                    wire:model="status"
+                    required>
+                    <option value="Agendado">Agendado</option>
+                    <option value="Confirmado">Confirmado</option>
+                    <option value="Check-in">Check-in</option>
+                    <option value="Concluído">Concluído</option>
+                    <option value="Cancelado">Cancelado</option>
+                </x-ui.form-select>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Data/Hora Início *</label>
-                    <input type="datetime-local" wire:model="dataHoraInicio" wire:change="verificarConflitos" 
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                    @error('dataHoraInicio') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                </div>
+                <x-ui.form-input 
+                    label="Data/Hora Início" 
+                    type="datetime-local"
+                    wire:model="dataHoraInicio" 
+                    wire:change="verificarConflitos"
+                    required
+                    help="Data e hora de início do atendimento" />
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Data/Hora Fim *</label>
-                    <input type="datetime-local" wire:model="dataHoraFim" wire:change="verificarConflitos" 
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                    @error('dataHoraFim') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                </div>
+                <x-ui.form-input 
+                    label="Data/Hora Fim" 
+                    type="datetime-local"
+                    wire:model="dataHoraFim" 
+                    wire:change="verificarConflitos"
+                    required
+                    help="Data e hora de término do atendimento" />
             </div>
 
             <!-- Recorrência -->
@@ -120,13 +118,16 @@
             <div class="flex justify-end space-x-4 pt-4 border-t border-gray-200">
                 <button type="button" 
                         wire:click="$dispatch('fechar-modal-atendimento')"
-                        class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">
+                        class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed">
                     Cancelar
                 </button>
-                <button type="submit" 
-                        class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                <x-ui.loading-button 
+                    type="submit"
+                    target="salvar"
+                    loading-text="Salvando..."
+                    class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
                     {{ $atendimentoId ? 'Atualizar' : 'Salvar' }}
-                </button>
+                </x-ui.loading-button>
             </div>
         </div>
     </form>

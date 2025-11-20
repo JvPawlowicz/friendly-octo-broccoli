@@ -1,6 +1,10 @@
-# Equidade+
+# Equidade - Sistema de Gestão Clínica
 
-Sistema clínico construído em Laravel 12 + Livewire 3 para gestão de atendimentos, evoluções, avaliações e prontuário multiprofissional.
+Sistema clínico completo construído em Laravel 12 + Livewire 3 para gestão de atendimentos, evoluções, avaliações e prontuário multiprofissional.
+
+**Desenvolvido para o Grupo Equidade**
+
+> 📚 **Documentação Completa**: Consulte a [documentação organizada](docs/README.md) para guias detalhados sobre deploy, produção, configuração e desenvolvimento.
 
 ## Requisitos
 

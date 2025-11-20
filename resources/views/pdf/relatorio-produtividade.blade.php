@@ -2,63 +2,151 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Relatório de Produtividade</title>
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; color: #1f2937; font-size: 12px; }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4f46e5; padding-bottom: 12px; margin-bottom: 20px; }
-        .brand { font-size: 20px; font-weight: 700; color: #4f46e5; }
-        .meta { text-align: right; font-size: 11px; color: #6b7280; }
-        h2 { font-size: 18px; margin-bottom: 8px; color: #111827; }
-        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-        th { background: #eef2ff; color: #312e81; padding: 8px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
-        td { padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 12px; }
-        .summary { display: flex; gap: 16px; margin-top: 10px; }
-        .card { flex: 1; padding: 12px; border-radius: 10px; color: white; }
-        .indigo { background: linear-gradient(135deg, #4f46e5, #6366f1); }
-        .rose { background: linear-gradient(135deg, #f43f5e, #fb7185); }
-        .emerald { background: linear-gradient(135deg, #10b981, #34d399); }
-        .card-title { text-transform: uppercase; font-size: 10px; letter-spacing: .08em; margin-bottom: 6px; opacity: .85; }
-        .card-value { font-size: 20px; font-weight: 700; }
-        footer { margin-top: 24px; font-size: 10px; text-align: center; color: #9ca3af; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'DejaVu Sans', sans-serif;
+            font-size: 10px;
+            color: #333;
+        }
+        .header {
+            border-bottom: 3px solid #4f46e5;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            color: #4f46e5;
+            font-size: 20px;
+            margin-bottom: 5px;
+        }
+        .header-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 9px;
+            color: #666;
+        }
+        .filtros {
+            background: #f3f4f6;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 9px;
+        }
+        .filtros strong {
+            color: #4f46e5;
+        }
+        .resumo {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .card {
+            flex: 1;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 5px;
+            padding: 15px;
+        }
+        .card-title {
+            font-size: 9px;
+            color: #6b7280;
+            margin-bottom: 5px;
+        }
+        .card-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #111827;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        thead {
+            background: #4f46e5;
+            color: white;
+        }
+        th {
+            padding: 10px;
+            text-align: left;
+            font-size: 9px;
+            font-weight: bold;
+        }
+        td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 9px;
+        }
+        tbody tr:hover {
+            background: #f9fafb;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid #e5e7eb;
+            text-align: center;
+            font-size: 8px;
+            color: #6b7280;
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <div class="brand">Equidade+ Saúde Integrada</div>
-        <div class="meta">
-            <div>Relatório de Produtividade</div>
-            <div>Gerado em {{ now()->format('d/m/Y H:i') }}</div>
-            <div>Período {{ \Carbon\Carbon::parse($dataInicio)->format('d/m/Y') }} a {{ \Carbon\Carbon::parse($dataFim)->format('d/m/Y') }}</div>
+        <h1>Relatório de Produtividade</h1>
+        <div class="header-info">
+            <div>
+                <strong>Gerado por:</strong> {{ $usuario->name }}<br>
+                <strong>Data/Hora:</strong> {{ $geradoEm }}
+            </div>
+            <div>
+                <strong>Sistema:</strong> {{ config('app.name', 'Equidade') }}
+            </div>
         </div>
     </div>
 
-    <div class="summary">
-        <div class="card indigo">
-            <div class="card-title">Atendimentos concluídos</div>
-            <div class="card-value">{{ $totalAtendimentos }}</div>
+    <div class="filtros">
+        <strong>Período:</strong> {{ \Carbon\Carbon::parse($dataInicio)->format('d/m/Y') }} até {{ \Carbon\Carbon::parse($dataFim)->format('d/m/Y') }}
+        @if($profissionalSelecionado)
+            | <strong>Profissional:</strong> {{ $profissionalSelecionado }}
+        @endif
+        @if($unidadeSelecionada)
+            | <strong>Unidade:</strong> {{ $unidadeSelecionada }}
+        @endif
+    </div>
+
+    <div class="resumo">
+        <div class="card">
+            <div class="card-title">Total Concluídos</div>
+            <div class="card-value" style="color: #059669;">{{ $totalAtendimentos }}</div>
         </div>
-        <div class="card rose">
-            <div class="card-title">Cancelados / ausências</div>
-            <div class="card-value">{{ $totalCancelados }}</div>
+        <div class="card">
+            <div class="card-title">Total Cancelados</div>
+            <div class="card-value" style="color: #dc2626;">{{ $totalCancelados }}</div>
         </div>
-        <div class="card emerald">
+        <div class="card">
             <div class="card-title">Absenteísmo</div>
-            <div class="card-value">{{ number_format($percentualAbsenteismo, 1, ',', '.') }}%</div>
+            <div class="card-value" style="color: #d97706;">{{ number_format($percentualAbsenteismo, 1) }}%</div>
         </div>
     </div>
 
-    <h2>Produtividade por profissional</h2>
     <table>
         <thead>
             <tr>
                 <th>Profissional</th>
-                <th>Total de atendimentos</th>
-                <th>Dias trabalhados</th>
-                <th>Média diária</th>
+                <th>Total de Atendimentos</th>
+                <th>Dias Trabalhados</th>
+                <th>Média Diária</th>
             </tr>
         </thead>
         <tbody>
-            @forelse($dados as $item)
+            @forelse($dadosProdutividade as $item)
                 <tr>
                     <td>{{ $item['profissional_nome'] }}</td>
                     <td>{{ $item['total'] }}</td>
@@ -67,14 +155,17 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="4">Nenhum atendimento concluído no período informado.</td>
+                    <td colspan="4" style="text-align: center; padding: 20px; color: #6b7280;">
+                        Nenhum dado encontrado para o período selecionado.
+                    </td>
                 </tr>
             @endforelse
         </tbody>
     </table>
 
-    <footer>
-        Relatório gerado automaticamente pelo Equidade+ • {{ now()->format('d/m/Y') }}
-    </footer>
+    <div class="footer">
+        <p>Este relatório foi gerado automaticamente pelo sistema {{ config('app.name', 'Equidade') }}</p>
+        <p>© {{ date('Y') }} {{ config('app.name', 'Equidade') }}. Todos os direitos reservados.</p>
+    </div>
 </body>
 </html>

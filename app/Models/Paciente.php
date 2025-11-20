@@ -23,6 +23,8 @@ class Paciente extends Model
         'metodo_comunicacao', 'informacoes_escola', 'informacoes_medicas_adicionais',
         // Endereço
         'cep', 'logradouro', 'numero', 'complemento', 'bairro', 'cidade', 'estado',
+        // Configurações de Paciente Padrão
+        'contar_como_atendimento', 'unidades_permitidas', 'tipos_agenda_permitidos', 'descricao_uso',
     ];
 
     /**
@@ -31,6 +33,9 @@ class Paciente extends Model
     protected $casts = [
         'data_nascimento' => 'date',
         'validade_carteirinha' => 'date',
+        'contar_como_atendimento' => 'boolean',
+        'unidades_permitidas' => 'array',
+        'tipos_agenda_permitidos' => 'array',
     ];
 
     /**
@@ -87,5 +92,29 @@ class Paciente extends Model
     public function avaliacoes(): HasMany
     {
         return $this->hasMany(Avaliacao::class);
+    }
+
+    /**
+     * Verifica se é o paciente padrão do sistema (para horários vagos/reuniões)
+     */
+    public function isPacientePadrao(): bool
+    {
+        return $this->cpf === '00000000000';
+    }
+
+    /**
+     * Busca o primeiro paciente padrão do sistema (método de compatibilidade)
+     */
+    public static function pacientePadrao(): ?self
+    {
+        return static::where('cpf', '00000000000')->first();
+    }
+
+    /**
+     * Busca todos os pacientes padrão do sistema
+     */
+    public static function pacientesPadrao()
+    {
+        return static::where('cpf', '00000000000')->where('status', 'Ativo')->get();
     }
 }

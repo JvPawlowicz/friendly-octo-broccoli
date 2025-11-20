@@ -26,6 +26,7 @@ class DashboardService
             $hoje = Carbon::today();
 
             $atendimentosBase = Atendimento::query()
+                ->contaveis() // Filtra apenas atendimentos contáveis
                 ->when($escopo['user_id'], fn ($q, $id) => $q->where('user_id', $id))
                 ->when($escopo['unidade_ids'], function ($q) use ($escopo) {
                     $q->whereHas('sala', fn ($sub) => $sub->whereIn('unidade_id', $escopo['unidade_ids']));

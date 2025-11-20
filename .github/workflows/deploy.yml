@@ -1,0 +1,58 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy (staging|production)"
+        required: false
+        default: "production"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      PNPM_VERSION: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        run: npm install -g pnpm@${PNPM_VERSION}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build apps
+        run: pnpm build
+
+      - name: Setup Railway
+        uses: railwayapp/railway-action@v1
+        with:
+          service: equidade-api
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Deploy API
+        run: railway up --service equidade-api --environment ${{ github.event.inputs.environment || 'production' }}
+
+      - name: Deploy Web
+        run: railway up --service equidade-web --environment ${{ github.event.inputs.environment || 'production' }}
+
+      - name: Deploy Admin
+        run: railway up --service equidade-admin --environment ${{ github.event.inputs.environment || 'production' }}
+
+      - name: Deploy Worker
+        run: railway up --service equidade-worker --environment ${{ github.event.inputs.environment || 'production' }}
+
+      - name: Run migrations
+        run: railway run --service equidade-api pnpm prisma migrate deploy
+

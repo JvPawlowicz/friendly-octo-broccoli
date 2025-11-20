@@ -1,0 +1,74 @@
+```mermaid
+%% ER simplificado
+erDiagram
+    USER ||--o{ APPOINTMENT : "profissional"
+    USER ||--o{ EVOLUTION : "autor"
+    USER ||--o{ ASSESSMENT : "autor"
+    USER ||--o{ MESSAGE : "envia"
+    USER ||--o{ AUDIT_LOG : "gera"
+    USER ||--o{ USER_PREFERENCE : "possui"
+    USER ||--o{ REFRESH_TOKEN : "tem"
+
+    UNIT ||--o{ USER : "contém"
+    UNIT ||--o{ APPOINTMENT : "contém"
+    UNIT ||--o{ PATIENT : "contém"
+    UNIT ||--o{ MESSAGE : "contexto"
+    UNIT ||--o{ NOTIFICATION : "destino"
+
+    PATIENT ||--o{ APPOINTMENT : "recebe"
+    PATIENT ||--o{ EVOLUTION : "possui"
+    PATIENT ||--o{ ASSESSMENT : "possui"
+    PATIENT ||--o{ PATIENT_DOCUMENT : "possui"
+    PATIENT ||--o{ PATIENT_TIMELINE_EVENT : "possui"
+
+    APPOINTMENT ||--|| EVOLUTION : "gera 1:1"
+    APPOINTMENT ||--o{ AUDIT_LOG : "alterações"
+
+    ASSESSMENT_TEMPLATE ||--o{ ASSESSMENT : "instancia"
+
+    NOTIFICATION ||--o{ NOTIFICATION_USER : "lido por"
+```
+
+```mermaid
+%% Fluxo agenda -> evolução
+sequenceDiagram
+    participant Sec as Secretária
+    participant Web as Frontend
+    participant API as Nest API
+    participant DB as PostgreSQL
+    participant Worker as Worker BullMQ
+
+    Sec->>Web: Criar agendamento
+    Web->>API: POST /appointments
+    API->>DB: Inserir appointment
+    API-->>Web: 201 criado
+
+    Sec->>Web: Concluir atendimento
+    Web->>API: POST /appointments/:id/complete
+    API->>DB: Atualiza status
+    API->>Worker: Emitir evento AppointmentCompleted
+    Worker->>DB: Criar evolução pendente
+
+    Profissional->>Web: Abrir evolução
+    Web->>API: GET /evolutions/:id
+    API-->>Web: Dados evolução
+    Profissional->>Web: Finalizar
+    Web->>API: POST /evolutions/:id/finalize
+    API->>DB: Atualiza status + assinatura
+    API->>Worker: EvolutionFinalized
+    Worker->>DB: Adiciona timeline event
+```
+
+```mermaid
+%% Pipeline CI/CD (simplificado)
+flowchart LR
+    A[Push PR] --> B[GitHub Actions CI]
+    B --> C[Lint + Testes + Build]
+    C -->|OK| D[Merge Develop]
+    D --> E[Deploy Staging (Railway)]
+    E --> F[Smoke Tests]
+    F -->|OK| G[Merge Main]
+    G --> H[Deploy Produção (Railway)]
+    H --> I[Monitoramento & Alertas]
+```
+

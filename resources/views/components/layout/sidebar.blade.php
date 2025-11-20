@@ -1,11 +1,19 @@
 <aside class="hidden lg:flex lg:w-72 lg:flex-col lg:fixed lg:inset-y-0 bg-white border-r border-slate-200">
     <div class="flex grow flex-col gap-y-8 overflow-y-auto px-6 py-8">
         <div class="flex h-12 shrink-0 items-center">
-            <a href="{{ route('dashboard') }}" class="flex items-center gap-2 text-2xl font-bold text-indigo-600">
-                <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ config('app.name', 'Equidade+') }}</span>
+            <a href="{{ route('dashboard') }}" class="flex items-center gap-2">
+                @php
+                    $logoPath = 'images/logo.png';
+                    $logoExists = file_exists(public_path($logoPath));
+                @endphp
+                @if($logoExists)
+                    <img src="{{ asset($logoPath) }}" alt="{{ config('app.name', 'Equidade') }}" class="h-10 w-auto">
+                @else
+                    <svg class="w-8 h-8 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="text-2xl font-bold text-indigo-600">{{ config('app.name', 'Equidade') }}</span>
+                @endif
             </a>
         </div>
 
@@ -71,7 +79,7 @@
                 @endif
 
                 <li>
-                    <a href="{{ route('app.avaliacoes') }}"
+                    <a href="{{ route('app.avaliacoes.list') }}"
                        class="group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition {{ $isActive('avaliacoes') && !$isActive('minhas-avaliacoes') ? 'bg-indigo-50 text-indigo-700 shadow-sm border border-indigo-100' : 'text-slate-600 hover:text-indigo-700 hover:bg-indigo-50/60' }}">
                         <svg class="h-5 w-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -94,13 +102,13 @@
                     </li>
 
                     <li>
-                        <a href="{{ route('app.minha-disponibilidade') }}"
-                           class="group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition {{ $isActive('minha-disponibilidade') ? 'bg-indigo-50 text-indigo-700 shadow-sm border border-indigo-100' : 'text-slate-600 hover:text-indigo-700 hover:bg-indigo-50/60' }}">
+                        <a href="{{ route('app.disponibilidade') }}"
+                           class="group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition {{ $isActive('disponibilidade') || $isActive('minha-disponibilidade') ? 'bg-indigo-50 text-indigo-700 shadow-sm border border-indigo-100' : 'text-slate-600 hover:text-indigo-700 hover:bg-indigo-50/60' }}">
                             <svg class="h-5 w-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                       d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            Minha Disponibilidade
+                            Disponibilidade
                         </a>
                     </li>
                 @endif
@@ -131,15 +139,16 @@
             </ul>
 
             <div class="mt-auto pt-6">
-                <div class="rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white p-4 shadow-lg">
-                    <p class="text-sm font-semibold">Sugestões</p>
+                <a href="{{ route('app.central-ajuda') }}" 
+                   class="block rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white p-4 shadow-lg transition hover:shadow-xl hover:from-indigo-600 hover:to-purple-700 {{ $isActive('central-ajuda') ? 'ring-2 ring-indigo-300 ring-offset-2' : '' }}">
+                    <p class="text-sm font-semibold">Central de Ajuda</p>
                     <p class="mt-2 text-xs text-indigo-50 leading-5">
-                        Envie feedbacks para melhorar a experiência clínica e administrativa.
+                        Envie dúvidas, sugestões ou reporte problemas. Estamos aqui para ajudar!
                     </p>
-                    <button type="button" class="mt-4 inline-flex w-full items-center justify-center rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15">
-                        Enviar feedback
-                    </button>
-                </div>
+                    <div class="mt-4 inline-flex w-full items-center justify-center rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white">
+                        Fale conosco
+                    </div>
+                </a>
             </div>
         </nav>
     </div>

@@ -6,7 +6,7 @@
                 <div class="p-6">
                     <div class="flex justify-between items-center">
                         <div>
-                            <h1 class="text-2xl font-bold text-gray-900 mb-2">Minha Disponibilidade</h1>
+                            <h1 class="text-2xl font-bold text-gray-900 mb-2">Disponibilidade</h1>
                             <p class="text-gray-600">Gerencie seus horários de disponibilidade para atendimentos</p>
                         </div>
                         <button wire:click="abrirModal" 
@@ -21,6 +21,9 @@
             </div>
 
             <!-- Disponibilidades por Dia -->
+            @php
+                $disponibilidades = $this->disponibilidades;
+            @endphp
             @if($disponibilidades->isEmpty())
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="p-12 text-center">

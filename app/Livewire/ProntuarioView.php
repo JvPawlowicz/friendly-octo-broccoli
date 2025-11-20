@@ -262,12 +262,10 @@ class ProntuarioView extends Component
         $this->validate([
             'titulo_documento' => 'required|string|max:255',
             'categoria' => 'nullable|string|max:255',
-            'arquivo' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240', // 10MB
+            'arquivo' => ['required', 'file', new \App\Rules\ValidFileUpload(['pdf', 'jpg', 'jpeg', 'png'], 10240)],
         ], [
             'titulo_documento.required' => 'O título do documento é obrigatório.',
             'arquivo.required' => 'É necessário selecionar um arquivo.',
-            'arquivo.mimes' => 'O arquivo deve ser PDF ou imagem (JPG, PNG).',
-            'arquivo.max' => 'O arquivo não pode ser maior que 10MB.',
         ]);
 
         try {

@@ -1,0 +1,44 @@
+# Configuração Nixpacks para OpenEMR no Railway
+# Este arquivo configura o build do OpenEMR na plataforma Railway
+
+[phases.setup]
+# Instalar dependências do sistema
+nixPkgs = [
+  "php83",
+  "php83Extensions.curl",
+  "php83Extensions.pdo_mysql",
+  "php83Extensions.mysqli",
+  "php83Extensions.gd",
+  "php83Extensions.mbstring",
+  "php83Extensions.xml",
+  "php83Extensions.zip",
+  "php83Extensions.ldap",
+  "php83Extensions.soap",
+  "php83Packages.composer",
+  "apacheHttpd",
+  "mysql"
+]
+
+[phases.install]
+# Instalar dependências PHP via Composer (se houver)
+cmds = [
+  "if [ -f composer.json ]; then composer install --no-dev --optimize-autoloader; fi"
+]
+
+[phases.build]
+# Build não é necessário para OpenEMR, mas pode ser usado para preparar arquivos
+cmds = [
+  "chmod +x scripts/*.sh 2>/dev/null || true",
+  "if [ -f setup-openemr.sh ]; then chmod +x setup-openemr.sh; fi"
+]
+
+[start]
+# Comando de inicialização
+# Usa script customizado ou Apache diretamente
+cmd = "if [ -f railway-start.sh ]; then ./railway-start.sh; else apache2-foreground; fi"
+
+# Variáveis de ambiente padrão (podem ser sobrescritas no Railway)
+[env]
+PHP_INI_SCAN_DIR = "/usr/local/etc/php/conf.d"
+APACHE_DOCUMENT_ROOT = "/var/www/html"
+

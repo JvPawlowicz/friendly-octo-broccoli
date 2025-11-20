@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Helpers\DisponibilidadeHelper;
 use App\Models\Atendimento;
 use App\Models\BloqueioAgenda;
 use App\Models\Paciente;
@@ -122,6 +123,24 @@ class FormAtendimento extends Component
             $conflitos[] = "Horário bloqueado: {$bloqueio->titulo_bloqueio}";
         }
 
+        // Verifica disponibilidade do profissional (inclui Admin se tiver disponibilidade)
+        if ($this->userId) {
+            $profissional = User::find($this->userId);
+            if ($profissional && $profissional->hasAnyRole(['Profissional', 'Admin'])) {
+                $disponivel = DisponibilidadeHelper::verificarDisponibilidade(
+                    $this->userId,
+                    $inicio,
+                    $fim
+                );
+                
+                if (!$disponivel) {
+                    $diaSemana = $inicio->dayOfWeek;
+                    $dias = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+                    $conflitos[] = "Profissional não está disponível neste horário ({$dias[$diaSemana]}, {$inicio->format('H:i')} - {$fim->format('H:i')})";
+                }
+            }
+        }
+
         return $conflitos;
     }
 
@@ -193,13 +212,30 @@ class FormAtendimento extends Component
             }
 
             $paciente = Paciente::findOrFail($this->pacienteId);
-            if (!$paciente->unidade_padrao_id || !in_array((int) $paciente->unidade_padrao_id, $scope, true)) {
-                session()->flash('error', 'O paciente selecionado pertence a uma unidade não autorizada.');
-                return;
+            
+            // Validação para pacientes padrão
+            if ($paciente->isPacientePadrao()) {
+                // Verifica unidades permitidas
+                if ($paciente->unidades_permitidas && !empty($paciente->unidades_permitidas)) {
+                    $unidadesPermitidas = array_map('intval', $paciente->unidades_permitidas);
+                    if (empty(array_intersect($unidadesPermitidas, $scope))) {
+                        session()->flash('error', 'Este paciente padrão não pode ser usado nas unidades selecionadas.');
+                        return;
+                    }
+                }
+                
+                // Verifica tipos de agenda permitidos (se implementado no futuro)
+                // Por enquanto, apenas valida unidades
+            } else {
+                // Validação normal para pacientes regulares
+                if (!$paciente->unidade_padrao_id || !in_array((int) $paciente->unidade_padrao_id, $scope, true)) {
+                    session()->flash('error', 'O paciente selecionado pertence a uma unidade não autorizada.');
+                    return;
+                }
             }
 
             $profissional = User::with('unidades', 'roles')->findOrFail($this->userId);
-            if (!$profissional->hasAnyRole(['Profissional', 'Coordenador'])) {
+            if (!$profissional->hasAnyRole(['Profissional', 'Coordenador', 'Admin'])) {
                 session()->flash('error', 'Selecione um profissional válido.');
                 return;
             }
@@ -296,23 +332,47 @@ class FormAtendimento extends Component
     {
         $scope = $this->resolveUnitScope();
 
+        // Busca pacientes padrão (sempre incluídos, respeitando unidades permitidas)
+        $pacientesPadrao = Paciente::where('cpf', '00000000000')
+            ->where('status', 'Ativo')
+            ->get()
+            ->filter(function ($paciente) use ($scope) {
+                // Se não tem unidades_permitidas definidas, permite em todas
+                if (empty($paciente->unidades_permitidas)) {
+                    return true;
+                }
+                // Se tem unidades_permitidas, verifica se está no escopo
+                if (is_array($scope) && !empty($scope)) {
+                    $unidadesPermitidas = array_map('intval', $paciente->unidades_permitidas);
+                    $scopeInt = array_map('intval', $scope);
+                    return !empty(array_intersect($scopeInt, $unidadesPermitidas));
+                }
+                // Se scope é null (Admin sem unidade), permite se não tiver restrição
+                return true;
+            });
+        
         if (is_array($scope)) {
             if (empty($scope)) {
                 $pacientes = collect();
             } else {
                 $pacientes = Paciente::where('status', 'Ativo')
+                    ->where('cpf', '!=', '00000000000') // Exclui pacientes padrão da query normal
                     ->whereIn('unidade_padrao_id', $scope)
                     ->orderBy('nome_completo')
                     ->get();
             }
         } else {
             $pacientes = Paciente::where('status', 'Ativo')
+                ->where('cpf', '!=', '00000000000') // Exclui pacientes padrão da query normal
                 ->orderBy('nome_completo')
                 ->get();
         }
+        
+        // Adiciona pacientes padrão no início da lista
+        $pacientes = $pacientesPadrao->merge($pacientes);
 
         $profissionaisQuery = User::whereHas('roles', function ($query) {
-            $query->whereIn('name', ['Profissional', 'Coordenador']);
+            $query->whereIn('name', ['Profissional', 'Coordenador', 'Admin']);
         });
 
         if (is_array($scope)) {

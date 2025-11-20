@@ -2,8 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Livewire\RelatorioFrequencia;
-use App\Livewire\RelatorioProdutividade;
+use App\Livewire\Relatorios;
 use App\Models\Atendimento;
 use App\Models\Paciente;
 use App\Models\Sala;
@@ -32,7 +31,8 @@ class RelatorioExportTest extends TestCase
         [$coordenador] = $this->criarAtendimentosDemo();
 
         $this->actingAs($coordenador);
-        $component = app(RelatorioFrequencia::class);
+        $component = app(Relatorios::class);
+        $component->tipoRelatorio = 'frequencia';
         $component->mount();
 
         $response = $component->exportar();
@@ -46,10 +46,11 @@ class RelatorioExportTest extends TestCase
         [$coordenador] = $this->criarAtendimentosDemo();
 
         $this->actingAs($coordenador);
-        $component = app(RelatorioProdutividade::class);
+        $component = app(Relatorios::class);
+        $component->tipoRelatorio = 'produtividade';
         $component->mount();
 
-        $response = $component->exportarCsv();
+        $response = $component->exportar();
 
         $this->assertInstanceOf(StreamedResponse::class, $response);
         $this->assertStringContainsString('text/csv', $response->headers->get('content-type'));

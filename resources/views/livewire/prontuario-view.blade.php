@@ -1,6 +1,13 @@
 <div>
         <div class="py-12">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+                @if($paciente)
+                <x-ui.breadcrumbs :items="[
+                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'Pacientes', 'url' => route('app.pacientes')],
+                    ['label' => $paciente->nome_completo]
+                ]" />
+                @endif
                 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
                     <div class="xl:col-span-2 bg-white border border-slate-200 shadow-sm rounded-2xl p-6">
                         <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
